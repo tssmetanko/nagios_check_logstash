@@ -101,6 +101,13 @@ def build_logstash_message(host=socket.gethostname()):
 	}
 	return(message)
 
+def send_heartbeat_to_file(file,message):
+	send_time = time.time()
+	log_file = open(file,'w')
+	log_file.write(message + '\n')
+	log_file.close
+	return(send_time)
+
 def send_heardbeat_to_redis(redis_connection,key_name,message):
 	#--the `redis_connect` variable should be a result of `connect_to_redis` function 
 	#--the `message` variable should be result of `build_logstash_message` function
@@ -137,7 +144,7 @@ def nagios_event(message,status):
 
 cmd_options = build_options()
 
-if cmd_options.redis_host :
+if 'redis_host' in vars(cmd_options):
 	rediska = connect_to_redis(
 		host=cmd_options.redis_host, 
 		port=cmd_options.redis_port, 
@@ -146,8 +153,11 @@ if cmd_options.redis_host :
 	)
 	heartbeat_message = build_logstash_message()
 	time_of_send = send_heardbeat_to_redis(rediska,key_name=cmd_options.redis_key,message=heartbeat_message)
+elif 'file' in vars(cmd_options):
+	heartbeat_message = health_id()
+	time_of_send = send_heartbeat_to_file(cmd_options.file,heartbeat_message)
 	
-
+	
 es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
 time_of_receive = read_heartbeat_from_elasticsearch(
 	es_connection=es_connection, 
