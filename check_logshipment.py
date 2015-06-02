@@ -103,7 +103,7 @@ def build_logstash_message(host=socket.gethostname()):
 
 def send_heartbeat_to_file(file,message):
 	send_time = time.time()
-	log_file = open(file,'a')
+	log_file = open(file,'w')
 	log_file.write(message + '\n')
 	log_file.close()
 	return(send_time)
