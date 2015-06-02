@@ -162,8 +162,6 @@ if 'redis_host' in vars(cmd_options):
 elif 'file' in vars(cmd_options):
 	heartbeat_message = health_id()
 	time_of_send = send_heartbeat_to_file(cmd_options.file,heartbeat_message)
-	clean_heartbeat_file(cmd_options.file)
-	
 	
 es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
 time_of_receive = read_heartbeat_from_elasticsearch(
