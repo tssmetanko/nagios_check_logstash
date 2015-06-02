@@ -175,6 +175,14 @@ time_of_receive = read_heartbeat_from_elasticsearch(
 
 time_lag = time_of_receive - time_of_send
 
+#clean temporary data
+if 'file' in vars(cmd_options):
+	# we can't perform this step in the same 'if' statement above,
+	# because logstash does not have time to process event before we clean log.
+	# So, let's do it later, after we receive responce from ES.
+	clean_heartbeat_file(cmd_options.file)
+
+#send nagios messages and exit
 nagios_message = 'the time latency of log shipment is - %f' % (time_lag)
 if time_lag >= cmd_options.critical:
 	nagios_status = 2
