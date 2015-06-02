@@ -67,7 +67,7 @@ def get_random_str(length):
 def health_id():
 	if not HEALTH_ID:
 		global HEALTH_ID 
-		HEALTH_ID = get_random_str(16)
+		HEALTH_ID = get_random_str(32)
 	return(HEALTH_ID)
 		
 def connect_to_redis(host, port=6379, db=0, timeout=30):
@@ -93,12 +93,11 @@ def build_logstash_message(host=socket.gethostname()):
 	message = {
 		'version' : "1.1",
 		'hostname': host,
-		'short_message': "heatht check message",
-		'full_massage': "how are you man?",
+		'short_message': "heartbeat of logstash",
 		'timestamp': current_time_tsmp,
 		'level': 1,
 		'type': "health-monitor",
-		'_health_id': health_id(),
+		'message': health_id(),
 	}
 	return(message)
 
@@ -118,7 +117,7 @@ def read_heartbeat_from_elasticsearch(es_connection, timeout, time_format, index
 	matches = None
 	index_date = datetime.now().strftime(time_format)
 	index = "%s-%s" % (index_name,index_date)
-	query = '_health_id : "%s"' % health_id()
+	query = 'message : "%s"' % health_id()
 	for i in range(timeout):
 		matches = es_connection.search(index=index, q=query, size=1)
 		hits = matches['hits']['hits']
