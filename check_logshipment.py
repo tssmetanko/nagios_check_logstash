@@ -34,7 +34,7 @@ def build_options():
 	parser.add_argument('--timeout', '-T', default=30, nargs='?', type=int, 
 		help='Timeout in seconds for wait answer from ES, or for send heartbeat message. (default: 30)')
 	parser.add_argument('--index-time-format', default='%Y.%m.%d', type=str, nargs='?')
-		help='ES index time-suffix format. (default: %%Y.%%m.%%d)')
+		help='ES index time-suffix format. (default: %%Y.%%m.%%d)'),
 	parser.add_argument('--index-name', default='health-monitor', nargs='?', type=str,
 		help='Name of ES index where heartbeat messages should appear. (deafult: health-monitor)')
 	#---sub command and options' for <file>
