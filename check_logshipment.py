@@ -105,7 +105,7 @@ def send_heartbeat_to_file(file,message):
 	send_time = time.time()
 	log_file = open(file,'a')
 	log_file.write(message + '\n')
-	log_file.close
+	log_file.close()
 	return(send_time)
 
 def send_heardbeat_to_redis(redis_connection,key_name,message):
