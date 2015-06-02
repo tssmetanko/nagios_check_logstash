@@ -103,11 +103,17 @@ def build_logstash_message(host=socket.gethostname()):
 
 def send_heartbeat_to_file(file,message):
 	send_time = time.time()
-	log_file = open(file,'w')
+	log_file = open(file,'a')
 	log_file.write(message + '\n')
 	log_file.close()
 	return(send_time)
 
+def clean_heartbeat_file(file):
+	#for preventation of file grows, we can clean this file. 
+	log_file = open(file,'w')
+	log_file.write('')
+	log_file.close()
+	
 def send_heardbeat_to_redis(redis_connection,key_name,message):
 	#--the `redis_connect` variable should be a result of `connect_to_redis` function 
 	#--the `message` variable should be result of `build_logstash_message` function
@@ -156,6 +162,7 @@ if 'redis_host' in vars(cmd_options):
 elif 'file' in vars(cmd_options):
 	heartbeat_message = health_id()
 	time_of_send = send_heartbeat_to_file(cmd_options.file,heartbeat_message)
+	clean_heartbeat_file(cmd_options.file)
 	
 	
 es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
