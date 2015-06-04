@@ -23,10 +23,10 @@ def build_options():
 		and wait until this event appear in Elasticsearch.')
 	#---global options
 	subparsers = parser.add_subparsers(help='sub-command help')
-	parser.add_argument('--critical', '-C', default=3, nargs='?', const=3,
-		help='Time lag for detect CRITICAL  (default: 3)')
-	parser.add_argument('--warning', '-W', default=2, nargs='?', const=2,
-		help='Time lag for detect WARNING (default: 2)')
+	parser.add_argument('--critical', '-C', default=3, nargs='?', const=3, type=float,
+		help='Time lag for detect CRITICAL  (default: 3.0)')
+	parser.add_argument('--warning', '-W', default=2, nargs='?', const=2, type=float,
+		help='Time lag for detect WARNING (default: 2.0)')
 	parser.add_argument('--es-host', default='localhost', nargs='?', 
 		help='Elasticsearch host (default: localhost)')
 	parser.add_argument('--es-port', '-P', default=9200, nargs='?', type=int, 
@@ -57,6 +57,7 @@ def build_options():
 	#parset_redis.add_argument('--event-type')
 	
 	args = parser.parse_args()
+	print(args)
 	return(args)
 	
 def get_random_str(length):
@@ -65,8 +66,8 @@ def get_random_str(length):
 	return(random_data)
 
 def health_id():
+	global HEALTH_ID
 	if not HEALTH_ID:
-		global HEALTH_ID 
 		HEALTH_ID = get_random_str(32)
 	return(HEALTH_ID)
 		
