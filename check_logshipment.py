@@ -8,12 +8,12 @@ import time
 import random
 import string
 import redis
+import zlib
 from datetime import datetime
 from elasticsearch import Elasticsearch
 
 # TODO: add ability to set timezone, but for now you can export TZ shell variable if you need to change timezone
 #export TZ="/usr/share/zoneinfo/America/Chicago".
-# TODO: add ability to send heartbeat by GELF.
 
 HEALTH_ID = None
 NAGIOS_STATUSES = { 0 : 'OK', 1 : 'WARNING', 2 : 'CRITICAL', 3 : 'UNKNOWN' }
@@ -56,6 +56,13 @@ def build_options():
 	parser_redis.add_argument('--redis-key', default='logstash-key', nargs='?', type=str,
 		help='Redis key where we should send a heartbeat event')
 	#parset_redis.add_argument('--event-type')
+	#---sub command and options for <gelf>
+	parser_gelf = subparsers.add_parser('gelf', help="gelf -h")
+	parser_gelf.required = False
+	parser_gelf.add_argument('--gelf-host', default='localhost', type=str,
+		help="GELF host where we should send heartbeat event (default: localhost)")
+	parser_gelf.add_argument('--gelf-port', default='12201', type=int,
+		help='GELF port where we should send heartbeat event (default: 12201)')
 	
 	args = parser.parse_args()
 	#print(args)
@@ -89,13 +96,23 @@ def connect_to_ES(host,port):
 	else:
 		nagios_event('Can\'t establish connection to ES server.',3)
 		return(None)
+
+def send_heartbeat_to_gelf(message,host,port):
+	message = json.dumps(message, sort_keys=True, separators=(',',': '))
+	send_time = time.time()
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+	if sock.sendto(zlib.compress(message),(host,port)):
+		return(send_time)
+	else:
+		nagios_event('Cant\,t send heartbeat for GELF', 3)
 	
 def build_logstash_message(host=socket.gethostname()):
 	current_time_tsmp = time.time()
 	message = {
 		'version' : "1.1",
 		'hostname': host,
-		'short_message': "heartbeat of logstash",
+		'short_message': health_id(),
+		'full_message': health_id(),
 		'timestamp': current_time_tsmp,
 		'level': 1,
 		'type': "health-monitor",
@@ -152,6 +169,8 @@ def nagios_event(message,status):
 
 def main():
 	cmd_options = build_options()
+	
+	#---send heartbeat to logstash
 	if 'redis_host' in vars(cmd_options):
 		rediska = connect_to_redis(
 			host=cmd_options.redis_host, 
@@ -164,7 +183,11 @@ def main():
 	elif 'file' in vars(cmd_options):
 		heartbeat_message = health_id()
 		time_of_send = send_heartbeat_to_file(cmd_options.file,heartbeat_message)
+	elif 'gelf_host' in vars(cmd_options):
+		heartbeat_message = build_logstash_message()
+		time_of_send = send_heartbeat_to_gelf(heartbeat_message,cmd_options.gelf_host,cmd_options.gelf_port)
 	
+	#---read heartbeat from elasticsearch 
 	es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
 	time_of_receive = read_heartbeat_from_elasticsearch(
 		es_connection=es_connection, 
@@ -172,17 +195,18 @@ def main():
 		time_format=cmd_options.index_time_format, 
 		index_name=cmd_options.index_name
 	)
-
+	
+	#---compare time of send and time of receive
 	time_lag = time_of_receive - time_of_send
 
-#	clean temporary data
+	#---clean temporary data
 	if 'file' in vars(cmd_options):
 		# we can't perform this step in the same 'if' statement above,
 		# because logstash does not have time to process event before we clean log.
 		# So, let's do it later, after we receive responce from ES.
 		clean_heartbeat_file(cmd_options.file)
 
-	#send nagios messages and exit
+	#---send nagios messages and exit
 	nagios_message = 'the latency of log shipment is - %.2f sec' % (time_lag)
 	if time_lag >= cmd_options.critical:
 		nagios_status = 2
