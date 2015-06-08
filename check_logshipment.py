@@ -12,7 +12,8 @@ from datetime import datetime
 from elasticsearch import Elasticsearch
 
 # TODO: add ability to set timezone, but for now you can export TZ shell variable if you need to change timezone
-#export TZ="/usr/share/zoneinfo/America/Chicago"
+#export TZ="/usr/share/zoneinfo/America/Chicago".
+# TODO: add ability to send heartbeat by GELF.
 
 HEALTH_ID = None
 NAGIOS_STATUSES = { 0 : 'OK', 1 : 'WARNING', 2 : 'CRITICAL', 3 : 'UNKNOWN' }
