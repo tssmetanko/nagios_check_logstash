@@ -169,7 +169,6 @@ def nagios_event(message,status):
 
 def main():
 	cmd_options = build_options()
-	
 	#---send heartbeat to logstash
 	if 'redis_host' in vars(cmd_options):
 		rediska = connect_to_redis(
@@ -186,7 +185,6 @@ def main():
 	elif 'gelf_host' in vars(cmd_options):
 		heartbeat_message = build_logstash_message()
 		time_of_send = send_heartbeat_to_gelf(heartbeat_message,cmd_options.gelf_host,cmd_options.gelf_port)
-	
 	#---read heartbeat from elasticsearch 
 	es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
 	time_of_receive = read_heartbeat_from_elasticsearch(
@@ -195,17 +193,14 @@ def main():
 		time_format=cmd_options.index_time_format, 
 		index_name=cmd_options.index_name
 	)
-	
-	#---compare time of send and time of receive
+	#---compare time of send and time of receive. detecting the time lag
 	time_lag = time_of_receive - time_of_send
-
 	#---clean temporary data
 	if 'file' in vars(cmd_options):
 		# we can't perform this step in the same 'if' statement above,
 		# because logstash does not have time to process event before we clean log.
 		# So, let's do it later, after we receive responce from ES.
 		clean_heartbeat_file(cmd_options.file)
-
 	#---send nagios messages and exit
 	nagios_message = 'the latency of log shipment is - %.2f sec' % (time_lag)
 	if time_lag >= cmd_options.critical:
@@ -217,8 +212,8 @@ def main():
 	else:
 		nagios_status = 3
 		nagios_message = 'Unexpected error'
-
 	nagios_event(nagios_message,nagios_status)
+
 	
 if __name__ == '__main__':
 	main()
