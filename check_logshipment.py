@@ -76,7 +76,7 @@ def connect_to_redis(host, port=6379, db=0, timeout=30):
 	if connection.ping():
 		return(connection)
 	else:
-		print('Can\'t establish connection to redis server.')
+		nagios_event('Can\'t establish connection to redis server.',3)
 		return(None)
 
 def connect_to_ES(host,port):
@@ -86,7 +86,7 @@ def connect_to_ES(host,port):
 	if es.ping():
 		return(es)
 	else:
-		print('Can\'t establish connection to ES server.')
+		nagios_event('Can\'t establish connection to ES server.',3)
 		return(None)
 	
 def build_logstash_message(host=socket.gethostname()):
@@ -124,7 +124,7 @@ def send_heardbeat_to_redis(redis_connection,key_name,message):
 	if redis_connection.lpush(key_name, message):
 		return(send_time)
 	else:
-		print('Can\'t send heartbeat event')
+		nagios_event('Can\'t send heartbeat event',3)
 		return(None)
 
 def read_heartbeat_from_elasticsearch(es_connection, timeout, time_format, index_name):
@@ -140,7 +140,7 @@ def read_heartbeat_from_elasticsearch(es_connection, timeout, time_format, index
 		else: 
 			break
 	else:
-		print("timeout ecceded")
+		nagios_event("timeout exceeded")
 		return(None)
 	time_to_receive = time.time()
 	return(time_to_receive)
@@ -149,50 +149,51 @@ def nagios_event(message,status):
 	print('%s - %s' % (NAGIOS_STATUSES[status], message))
 	sys.exit(status)
 
-cmd_options = build_options()
-
-if 'redis_host' in vars(cmd_options):
-	rediska = connect_to_redis(
-		host=cmd_options.redis_host, 
-		port=cmd_options.redis_port, 
-		db=cmd_options.redis_db, 
-		timeout=cmd_options.timeout
+def main():
+	cmd_options = build_options()
+	if 'redis_host' in vars(cmd_options):
+		rediska = connect_to_redis(
+			host=cmd_options.redis_host, 
+			port=cmd_options.redis_port, 
+			db=cmd_options.redis_db, 
+			timeout=cmd_options.timeout
+		)
+		heartbeat_message = build_logstash_message()
+		time_of_send = send_heardbeat_to_redis(rediska,key_name=cmd_options.redis_key,message=heartbeat_message)
+	elif 'file' in vars(cmd_options):
+		heartbeat_message = health_id()
+		time_of_send = send_heartbeat_to_file(cmd_options.file,heartbeat_message)
+	
+	es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
+	time_of_receive = read_heartbeat_from_elasticsearch(
+		es_connection=es_connection, 
+		timeout=cmd_options.timeout, 
+		time_format=cmd_options.index_time_format, 
+		index_name=cmd_options.index_name
 	)
-	heartbeat_message = build_logstash_message()
-	time_of_send = send_heardbeat_to_redis(rediska,key_name=cmd_options.redis_key,message=heartbeat_message)
-elif 'file' in vars(cmd_options):
-	heartbeat_message = health_id()
-	time_of_send = send_heartbeat_to_file(cmd_options.file,heartbeat_message)
+
+	time_lag = time_of_receive - time_of_send
+
+#	clean temporary data
+	if 'file' in vars(cmd_options):
+		# we can't perform this step in the same 'if' statement above,
+		# because logstash does not have time to process event before we clean log.
+		# So, let's do it later, after we receive responce from ES.
+		clean_heartbeat_file(cmd_options.file)
+
+	#send nagios messages and exit
+	nagios_message = 'the latency of log shipment is - %.2f sec' % (time_lag)
+	if time_lag >= cmd_options.critical:
+		nagios_status = 2
+	elif time_lag >= cmd_options.warning:
+		nagios_status = 1
+	elif time_lag < cmd_options.warning:
+		nagios_status = 0
+	else:
+		nagios_status = 3
+		nagios_message = 'Unexpected error'
+
+	nagios_event(nagios_message,nagios_status)
 	
-es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
-time_of_receive = read_heartbeat_from_elasticsearch(
-	es_connection=es_connection, 
-	timeout=cmd_options.timeout, 
-	time_format=cmd_options.index_time_format, 
-	index_name=cmd_options.index_name
-)
-
-time_lag = time_of_receive - time_of_send
-
-#clean temporary data
-if 'file' in vars(cmd_options):
-	# we can't perform this step in the same 'if' statement above,
-	# because logstash does not have time to process event before we clean log.
-	# So, let's do it later, after we receive responce from ES.
-	clean_heartbeat_file(cmd_options.file)
-
-#send nagios messages and exit
-nagios_message = 'the latency of log shipment is - %.2f sec' % (time_lag)
-if time_lag >= cmd_options.critical:
-	nagios_status = 2
-elif time_lag >= cmd_options.warning:
-	nagios_status = 1
-elif time_lag < cmd_options.warning:
-	nagios_status = 0
-else:
-	nagios_status = 3
-	nagios_message = 'Unexpected error'
-
-nagios_event(nagios_message,nagios_status)
-	
-	
+if __name__ == '__main__':
+	main()
