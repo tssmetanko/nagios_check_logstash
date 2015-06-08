@@ -158,7 +158,7 @@ def read_heartbeat_from_elasticsearch(es_connection, timeout, time_format, index
 		else: 
 			break
 	else:
-		nagios_event("timeout exceeded")
+		nagios_event("timeout exceeded",3)
 		return(None)
 	time_to_receive = time.time()
 	return(time_to_receive)
