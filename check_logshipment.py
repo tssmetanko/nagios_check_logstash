@@ -91,9 +91,6 @@ def connect_to_redis(host, port=6379, db=0, timeout=30):
     return(None)
 
 def connect_to_ES(es_url):
-	#es = Elasticsearch([
-	#	{'host': host, 'port':port}
-	#])
   es = Elasticsearch([es_url])
   if es.ping():
     return(es)
