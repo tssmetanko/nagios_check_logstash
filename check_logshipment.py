@@ -7,7 +7,7 @@ import sys
 import time
 import random
 import string
-import redis
+#import redis
 import zlib
 from datetime import datetime
 from elasticsearch import Elasticsearch
@@ -28,10 +28,12 @@ def build_options():
 		help='Time lag to detect CRITICAL  (default: 3.0)')
 	parser.add_argument('--warning', '-W', default=2, nargs='?', const=2, type=float,
 		help='Time lag to detect WARNING (default: 2.0)')
-	parser.add_argument('--es-host', default='localhost', nargs='?', 
-		help='Elasticsearch host (default: localhost)')
-	parser.add_argument('--es-port', '-P', default=9200, nargs='?', type=int, 
-		help='Elasticsearch port (default: 9200)')
+	parser.add_argument('--es-url', default='http://localhost:9200', nargs='?', type=str,
+   help='Elasticsearch URL (default: http://user:secret@localhost:9200/)')
+  #parser.add_argument('--es-host', default='localhost', nargs='?', 
+	#	help='Elasticsearch host (default: localhost)')
+	#parser.add_argument('--es-port', '-P', default=9200, nargs='?', type=int, 
+  #	help='Elasticsearch port (default: 9200)')
 	parser.add_argument('--timeout', '-T', default=30, nargs='?', type=int, 
 		help='Timeout in seconds to wait for an answer from ES, or for sending a heartbeat message. (default: 30)')
 	parser.add_argument('--index-time-format', default='%Y.%m.%d', type=str, nargs='?',
@@ -80,22 +82,24 @@ def health_id():
 	return(HEALTH_ID)
 		
 def connect_to_redis(host, port=6379, db=0, timeout=30):
-	connection = redis.StrictRedis(host=host, port=port, db=db, socket_timeout=timeout)
-	if connection.ping():
-		return(connection)
-	else:
-		nagios_event('Can\'t establish connection to redis server.',3)
-		return(None)
+  import redis
+  connection = redis.StrictRedis(host=host, port=port, db=db, socket_timeout=timeout)
+  if connection.ping():
+    return(connection)
+  else:
+    nagios_event('Can\'t establish connection to redis server.',3)
+    return(None)
 
-def connect_to_ES(host,port):
-	es = Elasticsearch([
-		{'host': host, 'port':port}
-	])
-	if es.ping():
-		return(es)
-	else:
-		nagios_event('Can\'t establish connection to ES server.',3)
-		return(None)
+def connect_to_ES(es_url):
+	#es = Elasticsearch([
+	#	{'host': host, 'port':port}
+	#])
+  es = Elasticsearch([es_url])
+  if es.ping():
+    return(es)
+  else:
+    nagios_event('Can\'t establish connection to ES server.',3)
+    return(None)
 
 def send_heartbeat_to_gelf(message,host,port):
 	message = json.dumps(message, sort_keys=True, separators=(',',': '))
@@ -186,7 +190,7 @@ def main():
 		heartbeat_message = build_logstash_message()
 		time_of_send = send_heartbeat_to_gelf(heartbeat_message,cmd_options.gelf_host,cmd_options.gelf_port)
 	#---read heartbeat from elasticsearch 
-	es_connection = connect_to_ES(host=cmd_options.es_host,port=cmd_options.es_port)
+	es_connection = connect_to_ES(es_url=cmd_options.es_url)
 	time_of_receive = read_heartbeat_from_elasticsearch(
 		es_connection=es_connection, 
 		timeout=cmd_options.timeout, 
